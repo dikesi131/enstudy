@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+.mypy_cache/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Generated audio
+backend/generated_audio/
+
+# models
+models/

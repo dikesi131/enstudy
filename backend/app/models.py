@@ -1,0 +1,19 @@
+from sqlalchemy import Column, DateTime, Integer, String, Text, func
+
+from app.database import Base
+
+
+class StudyEntry(Base):
+    __tablename__ = "study_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    word = Column(String(255), nullable=False, index=True)
+    phonetic = Column(String(255), nullable=True)
+    part_of_speech = Column(String(100), nullable=True)
+    part_of_speech_all = Column(Text, nullable=True)
+    meaning = Column(Text, nullable=True)
+    meaning_all = Column(Text, nullable=True)
+    sentence = Column(Text, nullable=False)
+    sentence_audio_path = Column(String(512), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
