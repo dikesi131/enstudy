@@ -124,6 +124,9 @@ def generate_sentence_tts(payload: SentenceTTSRequest, db: Session = Depends(get
 	if not sentence_text:
 		raise HTTPException(status_code=400, detail="Sentence text is required")
 
+	# Normalize common invisible spaces copied from documents/web pages.
+	sentence_text = sentence_text.replace("\u00a0", " ")
+
 	final_dir = Path(__file__).resolve().parents[2] / "generated_audio"
 	final_dir.mkdir(parents=True, exist_ok=True)
 
@@ -159,6 +162,7 @@ def generate_sentence_tts(payload: SentenceTTSRequest, db: Session = Depends(get
 				cmd,
 				input=sentence_text,
 				text=True,
+				encoding="utf-8",
 				capture_output=True,
 				check=True,
 			)

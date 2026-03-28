@@ -21,6 +21,15 @@ def ensure_schema_updates() -> None:
     if "meaning_all" not in columns:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE study_entries ADD COLUMN meaning_all TEXT NULL"))
+    if "review_stage" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE study_entries ADD COLUMN review_stage INTEGER NOT NULL DEFAULT 0"))
+    if "last_reviewed_at" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE study_entries ADD COLUMN last_reviewed_at DATETIME NULL"))
+    if "next_review_at" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE study_entries ADD COLUMN next_review_at DATETIME NULL"))
 
 
 ensure_schema_updates()

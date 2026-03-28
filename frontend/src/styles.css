@@ -79,6 +79,66 @@ body {
   border: 1px solid var(--border);
 }
 
+.import-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 29, 24, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 999;
+}
+
+.import-dialog {
+  width: min(460px, 94vw);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fbfff8;
+  box-shadow: 0 16px 34px rgba(12, 26, 18, 0.25);
+  padding: 18px;
+}
+
+.import-dialog h3 {
+  margin: 0 0 8px;
+}
+
+.import-dialog p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.import-result-dialog {
+  width: min(420px, 92vw);
+}
+
+.import-result-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.progress-track {
+  margin-top: 12px;
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e5efe0;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #3c8f62, #205f44);
+  transition: width 160ms ease-out;
+}
+
+.progress-text {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
 .panel {
   display: flex;
   flex-direction: column;
@@ -234,11 +294,17 @@ textarea {
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .pager span {
   color: var(--muted);
   font-size: 13px;
+}
+
+.pager-jump-input {
+  width: 78px;
+  padding: 7px 8px;
 }
 
 textarea {
@@ -261,6 +327,30 @@ button:hover {
 
 button:active {
   transform: translateY(1px);
+}
+
+.review-rate.remembered {
+  background: #21754f;
+}
+
+.review-rate.remembered:hover {
+  background: #1a5e3f;
+}
+
+.review-rate.fuzzy {
+  background: #8a6a22;
+}
+
+.review-rate.fuzzy:hover {
+  background: #6f541b;
+}
+
+.review-rate.forgot {
+  background: #8f3a32;
+}
+
+.review-rate.forgot:hover {
+  background: #752f29;
 }
 
 .upload {

@@ -15,5 +15,8 @@ class StudyEntry(Base):
     meaning_all = Column(Text, nullable=True)
     sentence = Column(Text, nullable=False)
     sentence_audio_path = Column(String(512), nullable=True)
+    review_stage = Column(Integer, nullable=False, default=0)
+    last_reviewed_at = Column(DateTime, nullable=True)
+    next_review_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

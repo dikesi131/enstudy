@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  completeReview,
   createEntry,
   exportData,
   fetchEntries,
@@ -43,7 +44,7 @@ function TrendChart({ title, data }) {
 
 export default function App() {
   const [tab, setTab] = useState("复习");
-  const [period, setPeriod] = useState("weekly");
+  const [managePeriod, setManagePeriod] = useState("weekly");
   const [review, setReview] = useState({ items: [] });
   const [entries, setEntries] = useState([]);
   const [stats, setStats] = useState(null);
@@ -52,13 +53,18 @@ export default function App() {
   const [expandedMap, setExpandedMap] = useState({});
   const [reviewPage, setReviewPage] = useState(1);
   const [managePage, setManagePage] = useState(1);
+  const [reviewJumpPage, setReviewJumpPage] = useState("");
+  const [manageJumpPage, setManageJumpPage] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importResultCount, setImportResultCount] = useState(null);
 
   const [entryForm, setEntryForm] = useState({ word: "", sentence: "" });
 
-  const periodLabel = useMemo(() => {
+  const managePeriodLabel = useMemo(() => {
     const map = { weekly: "近一周", monthly: "近一月", yearly: "近一年" };
-    return map[period] || "近一周";
-  }, [period]);
+    return map[managePeriod] || "近一周";
+  }, [managePeriod]);
 
   const filteredEntries = useMemo(() => {
     const k = search.trim().toLowerCase();
@@ -80,20 +86,37 @@ export default function App() {
 
   async function loadReview() {
     try {
-      const data = await fetchReview(period, 50);
+      const data = await fetchReview(50);
       setReview(data);
       setReviewPage(1);
-      setMessage(`已加载 ${data.items.length} 条复习内容。`);
+      setMessage(`艾宾浩斯复习：今日应复习 ${data.items.length} 条词卡。`);
     } catch (err) {
       setMessage(err?.response?.data?.detail || "加载复习数据失败。\n请检查后端服务。 ");
     }
   }
 
+  async function handleCompleteReview(entryId, outcome) {
+    const outcomeLabelMap = {
+      remembered: "记住",
+      fuzzy: "模糊",
+      forgot: "忘记",
+    };
+    try {
+      await completeReview(entryId, outcome);
+      const label = outcomeLabelMap[outcome] || "模糊";
+      setMessage(`已记录掌握程度：${label}，并按艾宾浩斯曲线更新下次复习。 `);
+      loadReview();
+    } catch (err) {
+      setMessage(err?.response?.data?.detail || "标记复习失败。 ");
+    }
+  }
+
   async function loadEntries() {
     try {
-      const data = await fetchEntries();
+      const data = await fetchEntries(managePeriod);
       setEntries(data);
       setManagePage(1);
+      setManageJumpPage("");
     } catch (err) {
       setMessage(err?.response?.data?.detail || "加载词条失败。\n请检查接口。 ");
     }
@@ -110,7 +133,11 @@ export default function App() {
 
   useEffect(() => {
     loadReview();
-  }, [period]);
+  }, []);
+
+  useEffect(() => {
+    loadEntries();
+  }, [managePeriod]);
 
   useEffect(() => {
     if (tab === "词条管理") {
@@ -122,7 +149,6 @@ export default function App() {
   }, [tab]);
 
   useEffect(() => {
-    loadEntries();
     loadStats();
   }, []);
 
@@ -181,20 +207,38 @@ export default function App() {
   async function handleImport(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsImporting(true);
+    setImportProgress(0);
     try {
-      const result = await importData(file);
+      const result = await importData(file, (progressEvent) => {
+        const total = progressEvent?.total || 0;
+        if (!total) return;
+        const percent = Math.max(0, Math.min(100, Math.round((progressEvent.loaded / total) * 100)));
+        setImportProgress(percent);
+      });
+      const importedCount = result.imported_items || 0;
       const skipped = result.skipped_items || 0;
       const sampleSkipped = (result.skipped_words || []).slice(0, 8).join("、");
+      const profileFailed = result.profile_failed_items || 0;
+      const sampleProfileFailed = (result.profile_failed_words || []).slice(0, 8).join("、");
       setMessage(
         skipped
-          ? `导入完成：新增 ${result.imported_items || 0} 条，跳过 ${skipped} 条（重复单词）。${sampleSkipped ? ` 示例: ${sampleSkipped}` : ""}`
-          : `导入完成，共新增 ${result.imported_items || 0} 条。`
+          ? `导入完成：新增 ${importedCount} 条，跳过 ${skipped} 条（重复单词）。${sampleSkipped ? ` 示例: ${sampleSkipped}` : ""}${profileFailed ? ` 其中 ${profileFailed} 条词典信息获取失败，已仅导入单词和例句。${sampleProfileFailed ? ` 示例: ${sampleProfileFailed}` : ""}` : ""}`
+          : `导入完成，共新增 ${importedCount} 条。${profileFailed ? ` 其中 ${profileFailed} 条词典信息获取失败，已仅导入单词和例句。${sampleProfileFailed ? ` 示例: ${sampleProfileFailed}` : ""}` : ""}`
       );
+      setImportResultCount(importedCount);
       loadEntries();
       loadReview();
       loadStats();
     } catch (err) {
       setMessage(err?.response?.data?.detail || "导入失败。 ");
+    } finally {
+      setImportProgress(100);
+      setTimeout(() => {
+        setIsImporting(false);
+        setImportProgress(0);
+      }, 300);
+      e.target.value = "";
     }
   }
 
@@ -202,9 +246,19 @@ export default function App() {
     setExpandedMap((prev) => ({ ...prev, [entryId]: !prev[entryId] }));
   }
 
-  function renderPagination(page, totalPages, onChange) {
+  function renderPagination(page, totalPages, onChange, jumpPageValue, setJumpPageValue) {
+    function jumpToPage() {
+      const next = Number.parseInt(jumpPageValue, 10);
+      if (!Number.isInteger(next)) return;
+      onChange(Math.max(1, Math.min(totalPages, next)));
+      setJumpPageValue("");
+    }
+
     return (
       <div className="pager">
+        <button onClick={() => onChange(1)} disabled={page <= 1}>
+          首页
+        </button>
         <button onClick={() => onChange(Math.max(1, page - 1))} disabled={page <= 1}>
           上一页
         </button>
@@ -213,6 +267,27 @@ export default function App() {
         </span>
         <button onClick={() => onChange(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
           下一页
+        </button>
+        <button onClick={() => onChange(totalPages)} disabled={page >= totalPages}>
+          尾页
+        </button>
+        <input
+          className="pager-jump-input"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          placeholder="页码"
+          value={jumpPageValue}
+          onChange={(e) => setJumpPageValue(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              jumpToPage();
+            }
+          }}
+        />
+        <button onClick={jumpToPage} disabled={!jumpPageValue.trim()}>
+          跳转
         </button>
       </div>
     );
@@ -267,38 +342,64 @@ export default function App() {
 
       {message && <div className="message">{message}</div>}
 
+      {isImporting && (
+        <div className="import-mask" role="status" aria-live="polite">
+          <div className="import-dialog">
+            <h3>正在导入中</h3>
+            <p>文件上传和词典补全需要一些时间，请稍候。</p>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${importProgress}%` }} />
+            </div>
+            <p className="progress-text">上传进度: {importProgress}%</p>
+          </div>
+        </div>
+      )}
+
+      {importResultCount !== null && (
+        <div className="import-mask" role="dialog" aria-modal="true" aria-live="polite">
+          <div className="import-dialog import-result-dialog">
+            <h3>导入成功</h3>
+            <p>本次共导入 {importResultCount} 条词条。</p>
+            <div className="import-result-actions">
+              <button onClick={() => setImportResultCount(null)}>知道了</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === "复习" && (
         <section className="panel">
           <div className="row">
-            <h2>{periodLabel}复习</h2>
-            <div className="controls">
-              <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-                <option value="weekly">按周</option>
-                <option value="monthly">按月</option>
-                <option value="yearly">按年</option>
-              </select>
-            </div>
+            <h2>艾宾浩斯应复习词卡（今日）</h2>
           </div>
 
           <div className="card">
             <div className="card-header-row">
-              <h3>复习词条</h3>
-              <span className="chip">共 {review.items.length} 条</span>
+              <h3>应复习词条</h3>
+              <span className="chip">待复习 {review.items.length} 条</span>
             </div>
+            {!reviewPageItems.length && <p>当前范围内暂无应复习词条。</p>}
             {reviewPageItems.map((w) => (
               <div key={w.id} className="item">
                 <div>
                   <strong>{w.word}</strong>
+                  <p>
+                    复习阶段: 第 {Number(w.review_stage || 0) + 1} 轮 {w.is_due ? "（已到期）" : "（即将到期）"}
+                  </p>
+                  <p>下次复习时间: {w.next_review_at ? new Date(w.next_review_at).toLocaleString() : "-"}</p>
                   {renderEntryDetail(w)}
                   <p>例句: {w.sentence}</p>
                 </div>
                 <div className="controls">
                   <button onClick={() => playWordAudio(w.word)}>单词发音</button>
                   <button onClick={() => playSentenceAudio(w.sentence, w.id)}>例句朗读</button>
+                  <button className="review-rate remembered" onClick={() => handleCompleteReview(w.id, "remembered")}>记住</button>
+                  <button className="review-rate fuzzy" onClick={() => handleCompleteReview(w.id, "fuzzy")}>模糊</button>
+                  <button className="review-rate forgot" onClick={() => handleCompleteReview(w.id, "forgot")}>忘记</button>
                 </div>
               </div>
             ))}
-            {renderPagination(reviewPage, reviewTotalPages, setReviewPage)}
+            {renderPagination(reviewPage, reviewTotalPages, setReviewPage, reviewJumpPage, setReviewJumpPage)}
           </div>
         </section>
       )}
@@ -331,16 +432,25 @@ export default function App() {
             <div className="row">
               <h3>词条列表</h3>
               <div className="manage-tools">
+                <select
+                  value={managePeriod}
+                  onChange={(e) => setManagePeriod(e.target.value)}
+                  aria-label="词条时间范围"
+                >
+                  <option value="weekly">本周</option>
+                  <option value="monthly">本月</option>
+                  <option value="yearly">本年</option>
+                </select>
                 <input
                   className="search"
-                  placeholder="搜索单词/例句/释义"
+                  placeholder={`搜索${managePeriodLabel}单词/例句/释义`}
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
                     setManagePage(1);
                   }}
                 />
-                <span className="chip">命中 {filteredEntries.length} 条</span>
+                <span className="chip">{managePeriodLabel}命中 {filteredEntries.length} 条</span>
               </div>
             </div>
             {managePageItems.map((w) => (
@@ -356,7 +466,7 @@ export default function App() {
                 </div>
               </div>
             ))}
-            {renderPagination(managePage, manageTotalPages, setManagePage)}
+            {renderPagination(managePage, manageTotalPages, setManagePage, manageJumpPage, setManageJumpPage)}
           </div>
         </section>
       )}

@@ -45,6 +45,7 @@ def _import_json(raw: bytes, db: Session):
     imported_items = 0
     skipped_items = 0
     skipped_words: list[str] = []
+    profile_failed_words: list[str] = []
     seen_words: set[str] = set()
 
     for item in payload.items:
@@ -62,15 +63,17 @@ def _import_json(raw: bytes, db: Session):
             skipped_words.append(item.word)
             continue
 
+        entry_payload = schemas.StudyEntryCreate(word=item.word, sentence=item.sentence)
         profile = crud.fetch_word_profile(item.word)
         try:
             crud.create_entry_with_profile(
                 db,
-                schemas.StudyEntryCreate(word=item.word, sentence=item.sentence),
+                entry_payload,
                 profile,
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=502, detail=f"{item.word}: {exc}") from exc
+        except ValueError:
+            crud.create_entry_basic(db, entry_payload)
+            profile_failed_words.append(item.word)
         imported_items += 1
 
     return {
@@ -78,6 +81,8 @@ def _import_json(raw: bytes, db: Session):
         "imported_items": imported_items,
         "skipped_items": skipped_items,
         "skipped_words": skipped_words,
+        "profile_failed_items": len(profile_failed_words),
+        "profile_failed_words": profile_failed_words,
     }
 
 
@@ -89,6 +94,7 @@ def _import_csv(raw: bytes, db: Session):
     imported_items = 0
     skipped_items = 0
     skipped_words: list[str] = []
+    profile_failed_words: list[str] = []
     seen_words: set[str] = set()
 
     if {"word", "sentence"}.issubset(fields):
@@ -110,15 +116,17 @@ def _import_csv(raw: bytes, db: Session):
                 skipped_words.append(word)
                 continue
 
+            entry_payload = schemas.StudyEntryCreate(word=word, sentence=sentence)
             profile = crud.fetch_word_profile(word)
             try:
                 crud.create_entry_with_profile(
                     db,
-                    schemas.StudyEntryCreate(word=word, sentence=sentence),
+                    entry_payload,
                     profile,
                 )
-            except ValueError as exc:
-                raise HTTPException(status_code=502, detail=f"{word}: {exc}") from exc
+            except ValueError:
+                crud.create_entry_basic(db, entry_payload)
+                profile_failed_words.append(word)
             imported_items += 1
     else:
         raise HTTPException(
@@ -131,4 +139,6 @@ def _import_csv(raw: bytes, db: Session):
         "imported_items": imported_items,
         "skipped_items": skipped_items,
         "skipped_words": skipped_words,
+        "profile_failed_items": len(profile_failed_words),
+        "profile_failed_words": profile_failed_words,
     }

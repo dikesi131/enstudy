@@ -8,8 +8,8 @@ router = APIRouter(prefix="/entries", tags=["entries"])
 
 
 @router.get("", response_model=list[schemas.StudyEntryRead])
-def get_entries(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    rows = crud.list_entries(db, skip=skip, limit=limit)
+def get_entries(period: str = "weekly", skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    rows = crud.list_entries(db, skip=skip, limit=limit, period=period)
     return [crud.serialize_entry(row) for row in rows]
 
 

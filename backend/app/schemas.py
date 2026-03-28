@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,10 @@ class StudyEntryRead(BaseModel):
     meaning_items: list[str] = []
     sentence: str
     sentence_audio_path: Optional[str] = None
+    review_stage: int = 0
+    last_reviewed_at: Optional[datetime] = None
+    next_review_at: Optional[datetime] = None
+    is_due: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -43,6 +47,10 @@ class UnifiedImportPayload(BaseModel):
 class ReviewUnifiedResponse(BaseModel):
     period: str
     items: list[StudyEntryRead]
+
+
+class ReviewCompleteRequest(BaseModel):
+    outcome: Literal["remembered", "fuzzy", "forgot"]
 
 
 class TrendPoint(BaseModel):
