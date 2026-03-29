@@ -411,6 +411,42 @@ button:active {
   color: var(--muted);
 }
 
+.review-line-grid {
+  margin-top: 2px;
+}
+
+.review-line-single {
+  width: 100%;
+}
+
+.review-line-svg {
+  width: 100%;
+  height: 320px;
+  overflow: visible;
+}
+
+.review-axis {
+  stroke: #c6d4c0;
+  stroke-width: 1;
+}
+
+.review-line {
+  fill: none;
+  stroke: #2e7a56;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.review-dot {
+  fill: #2e7a56;
+}
+
+.review-x-label {
+  font-size: 10px;
+  fill: #5d665f;
+}
+
 @keyframes heroIn {
   from {
     opacity: 0;

@@ -65,3 +65,7 @@ class StatsUnifiedOverview(BaseModel):
     items_last_365_days: int
     weekly_trend: list[TrendPoint]
     monthly_trend: list[TrendPoint]
+    review_daily_trend: list[TrendPoint]
+    review_weekly_trend: list[TrendPoint]
+    review_monthly_trend: list[TrendPoint]
+    review_yearly_trend: list[TrendPoint]

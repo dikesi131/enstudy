@@ -20,3 +20,12 @@ class StudyEntry(Base):
     next_review_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ReviewLog(Base):
+    __tablename__ = "review_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    entry_id = Column(Integer, nullable=False, index=True)
+    outcome = Column(String(32), nullable=False)
+    reviewed_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)

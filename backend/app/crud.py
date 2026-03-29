@@ -373,7 +373,14 @@ def mark_entry_reviewed(db: Session, entry_id: int, outcome: str = "fuzzy"):
     setattr(row, "last_reviewed_at", now)
     setattr(row, "next_review_at", _calculate_next_review_at(now, next_stage))
 
+    review_log = models.ReviewLog(
+        entry_id=int(getattr(row, "id")),
+        outcome=outcome,
+        reviewed_at=now,
+    )
+
     db.add(row)
+    db.add(review_log)
     db.commit()
     db.refresh(row)
     return row
@@ -388,11 +395,28 @@ def _bucket_key_month(dt: datetime):
     return f"{dt.year}-{dt.month:02d}"
 
 
+def _bucket_key_day(dt: datetime):
+    return f"{dt.year}-{dt.month:02d}-{dt.day:02d}"
+
+
+def _bucket_key_year(dt: datetime):
+    return f"{dt.year}"
+
+
+def _shift_month_start(base: datetime, delta_months: int) -> datetime:
+    month_index = (base.month - 1) + delta_months
+    year = base.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    return base.replace(year=year, month=month, day=1)
+
+
 def get_unified_stats(db: Session):
-    now = datetime.utcnow()
-    t7 = now - timedelta(days=7)
-    t30 = now - timedelta(days=30)
-    t365 = now - timedelta(days=365)
+    # Use local calendar-day windows for UI labels such as "近 7 天".
+    now = datetime.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    t7 = today_start - timedelta(days=6)
+    t30 = today_start - timedelta(days=29)
+    t365 = today_start - timedelta(days=364)
 
     total_items = db.query(func.count(models.StudyEntry.id)).scalar() or 0
     items_last_7_days = (
@@ -418,6 +442,43 @@ def get_unified_stats(db: Session):
     weekly_points = [{"label": k, "count": weekly[k]} for k in sorted(weekly.keys())][-12:]
     monthly_points = [{"label": k, "count": monthly[k]} for k in sorted(monthly.keys())][-12:]
 
+    current_week_start = today_start - timedelta(days=today_start.weekday())
+    current_month_start = today_start.replace(day=1)
+    current_year_start = today_start.replace(month=1, day=1)
+
+    daily_keys = [_bucket_key_day(today_start - timedelta(days=i)) for i in reversed(range(14))]
+    weekly_keys = [_bucket_key_week(current_week_start - timedelta(weeks=i)) for i in reversed(range(12))]
+    monthly_keys = [_bucket_key_month(_shift_month_start(current_month_start, -i)) for i in reversed(range(12))]
+    yearly_keys = [_bucket_key_year(current_year_start.replace(year=current_year_start.year - i)) for i in reversed(range(5))]
+
+    review_window_start = current_year_start.replace(year=current_year_start.year - 4)
+    review_rows = (
+        db.query(models.ReviewLog.reviewed_at)
+        .filter(models.ReviewLog.reviewed_at >= review_window_start)
+        .all()
+    )
+
+    review_daily_counts: dict[str, int] = {}
+    review_weekly_counts: dict[str, int] = {}
+    review_monthly_counts: dict[str, int] = {}
+    review_yearly_counts: dict[str, int] = {}
+
+    for (reviewed_at,) in review_rows:
+        dt = reviewed_at
+        d_key = _bucket_key_day(dt)
+        w_key = _bucket_key_week(dt)
+        m_key = _bucket_key_month(dt)
+        y_key = _bucket_key_year(dt)
+        review_daily_counts[d_key] = review_daily_counts.get(d_key, 0) + 1
+        review_weekly_counts[w_key] = review_weekly_counts.get(w_key, 0) + 1
+        review_monthly_counts[m_key] = review_monthly_counts.get(m_key, 0) + 1
+        review_yearly_counts[y_key] = review_yearly_counts.get(y_key, 0) + 1
+
+    review_daily_points = [{"label": k, "count": review_daily_counts.get(k, 0)} for k in daily_keys]
+    review_weekly_points = [{"label": k, "count": review_weekly_counts.get(k, 0)} for k in weekly_keys]
+    review_monthly_points = [{"label": k, "count": review_monthly_counts.get(k, 0)} for k in monthly_keys]
+    review_yearly_points = [{"label": k, "count": review_yearly_counts.get(k, 0)} for k in yearly_keys]
+
     return {
         "total_items": total_items,
         "items_last_7_days": items_last_7_days,
@@ -425,4 +486,8 @@ def get_unified_stats(db: Session):
         "items_last_365_days": items_last_365_days,
         "weekly_trend": weekly_points,
         "monthly_trend": monthly_points,
+        "review_daily_trend": review_daily_points,
+        "review_weekly_trend": review_weekly_points,
+        "review_monthly_trend": review_monthly_points,
+        "review_yearly_trend": review_yearly_points,
     }

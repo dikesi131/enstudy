@@ -11,7 +11,7 @@ import {
   importData,
 } from "./api";
 
-const TABS = ["复习", "词条管理", "导入导出", "统计趋势"];
+const TABS = ["复习", "词条管理", "导入导出", "统计趋势", "复习曲线"];
 const REVIEW_PAGE_SIZE = 8;
 const MANAGE_PAGE_SIZE = 10;
 
@@ -42,6 +42,60 @@ function TrendChart({ title, data }) {
   );
 }
 
+function ReviewLineChart({ title, data }) {
+  const points = data || [];
+  const maxValue = Math.max(1, ...points.map((d) => d.count || 0));
+
+  if (!points.length) {
+    return (
+      <div className="card">
+        <h3>{title}</h3>
+        <p>暂无数据</p>
+      </div>
+    );
+  }
+
+  const width = 640;
+  const height = 220;
+  const left = 34;
+  const right = 16;
+  const top = 12;
+  const bottom = 34;
+  const innerW = width - left - right;
+  const innerH = height - top - bottom;
+  const stepX = points.length > 1 ? innerW / (points.length - 1) : 0;
+
+  const chartPoints = points.map((item, idx) => {
+    const x = left + stepX * idx;
+    const y = top + innerH - (Math.max(0, item.count || 0) / maxValue) * innerH;
+    return { x, y, label: item.label, count: item.count || 0 };
+  });
+
+  const polyline = chartPoints.map((p) => `${p.x},${p.y}`).join(" ");
+  const labelStep = Math.max(1, Math.ceil(points.length / 6));
+
+  return (
+    <div className="card">
+      <h3>{title}</h3>
+      <svg className="review-line-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <line x1={left} y1={top} x2={left} y2={height - bottom} className="review-axis" />
+        <line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} className="review-axis" />
+        <polyline points={polyline} className="review-line" />
+        {chartPoints.map((p, idx) => (
+          <g key={`${title}-point-${idx}`}>
+            <circle cx={p.x} cy={p.y} r="3.2" className="review-dot" />
+            {idx % labelStep === 0 || idx === chartPoints.length - 1 ? (
+              <text x={p.x} y={height - 10} textAnchor="middle" className="review-x-label">
+                {p.label}
+              </text>
+            ) : null}
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState("复习");
   const [managePeriod, setManagePeriod] = useState("weekly");
@@ -58,6 +112,7 @@ export default function App() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResultCount, setImportResultCount] = useState(null);
+  const [reviewCurveGranularity, setReviewCurveGranularity] = useState("daily");
 
   const [entryForm, setEntryForm] = useState({ word: "", sentence: "" });
 
@@ -83,6 +138,16 @@ export default function App() {
     const start = (managePage - 1) * MANAGE_PAGE_SIZE;
     return filteredEntries.slice(start, start + MANAGE_PAGE_SIZE);
   }, [filteredEntries, managePage]);
+
+  const reviewCurveConfig = useMemo(() => {
+    const map = {
+      daily: { title: "复习曲线（每天）", data: stats?.review_daily_trend || [] },
+      weekly: { title: "复习曲线（每周）", data: stats?.review_weekly_trend || [] },
+      monthly: { title: "复习曲线（每月）", data: stats?.review_monthly_trend || [] },
+      yearly: { title: "复习曲线（每年）", data: stats?.review_yearly_trend || [] },
+    };
+    return map[reviewCurveGranularity] || map.daily;
+  }, [reviewCurveGranularity, stats]);
 
   async function loadReview() {
     try {
@@ -143,7 +208,7 @@ export default function App() {
     if (tab === "词条管理") {
       loadEntries();
     }
-    if (tab === "统计趋势") {
+    if (tab === "统计趋势" || tab === "复习曲线") {
       loadStats();
     }
   }, [tab]);
@@ -512,6 +577,29 @@ export default function App() {
           <div className="grid two">
             <TrendChart title="按周趋势" data={stats?.weekly_trend || []} />
             <TrendChart title="按月趋势" data={stats?.monthly_trend || []} />
+          </div>
+        </section>
+      )}
+
+      {tab === "复习曲线" && (
+        <section className="panel">
+          <div className="row">
+            <h2>复习曲线</h2>
+            <div className="controls">
+              <select
+                value={reviewCurveGranularity}
+                onChange={(e) => setReviewCurveGranularity(e.target.value)}
+                aria-label="复习曲线时间粒度"
+              >
+                <option value="daily">每天</option>
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+                <option value="yearly">每年</option>
+              </select>
+            </div>
+          </div>
+          <div className="review-line-single">
+            <ReviewLineChart title={reviewCurveConfig.title} data={reviewCurveConfig.data} />
           </div>
         </section>
       )}
