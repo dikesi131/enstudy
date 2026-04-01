@@ -100,16 +100,16 @@ function ReviewLineChart({ title, data, yTickStep = 20 }) {
             <circle cx={p.x} cy={p.y} r="3.2" className="review-dot">
               <title>{`${p.label}: ${p.count}`}</title>
             </circle>
+            {p.count > 0 ? (
+              <text x={p.x} y={Math.max(top + 10, p.y - 8)} textAnchor="middle" className="review-value-label">
+                {p.count}
+              </text>
+            ) : null}
             {idx % labelStep === 0 || idx === chartPoints.length - 1 ? (
               <>
                 <text x={p.x} y={height - 10} textAnchor="middle" className="review-x-label">
                   {p.label}
                 </text>
-                {p.count > 0 ? (
-                  <text x={p.x} y={Math.max(top + 10, p.y - 8)} textAnchor="middle" className="review-value-label">
-                    {p.count}
-                  </text>
-                ) : null}
               </>
             ) : null}
           </g>
