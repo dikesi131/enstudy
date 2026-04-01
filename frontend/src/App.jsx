@@ -42,7 +42,7 @@ function TrendChart({ title, data }) {
   );
 }
 
-function ReviewLineChart({ title, data }) {
+function ReviewLineChart({ title, data, yTickStep = 20 }) {
   const points = data || [];
   const maxValue = Math.max(1, ...points.map((d) => d.count || 0));
 
@@ -64,30 +64,53 @@ function ReviewLineChart({ title, data }) {
   const innerW = width - left - right;
   const innerH = height - top - bottom;
   const stepX = points.length > 1 ? innerW / (points.length - 1) : 0;
+  const yAxisMax = Math.max(yTickStep, Math.ceil(maxValue / yTickStep) * yTickStep);
 
   const chartPoints = points.map((item, idx) => {
     const x = left + stepX * idx;
-    const y = top + innerH - (Math.max(0, item.count || 0) / maxValue) * innerH;
+    const y = top + innerH - (Math.max(0, item.count || 0) / yAxisMax) * innerH;
     return { x, y, label: item.label, count: item.count || 0 };
   });
 
   const polyline = chartPoints.map((p) => `${p.x},${p.y}`).join(" ");
   const labelStep = Math.max(1, Math.ceil(points.length / 6));
+  const yTicks = [];
+  for (let value = 0; value <= yAxisMax; value += yTickStep) {
+    const y = top + innerH - (value / yAxisMax) * innerH;
+    yTicks.push({ value, y });
+  }
 
   return (
     <div className="card">
       <h3>{title}</h3>
       <svg className="review-line-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        {yTicks.map((tick) => (
+          <g key={`${title}-y-${tick.value}`}>
+            <line x1={left} y1={tick.y} x2={width - right} y2={tick.y} className="review-y-grid" />
+            <text x={left - 6} y={tick.y + 3} textAnchor="end" className="review-y-label">
+              {tick.value}
+            </text>
+          </g>
+        ))}
         <line x1={left} y1={top} x2={left} y2={height - bottom} className="review-axis" />
         <line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} className="review-axis" />
         <polyline points={polyline} className="review-line" />
         {chartPoints.map((p, idx) => (
           <g key={`${title}-point-${idx}`}>
-            <circle cx={p.x} cy={p.y} r="3.2" className="review-dot" />
+            <circle cx={p.x} cy={p.y} r="3.2" className="review-dot">
+              <title>{`${p.label}: ${p.count}`}</title>
+            </circle>
             {idx % labelStep === 0 || idx === chartPoints.length - 1 ? (
-              <text x={p.x} y={height - 10} textAnchor="middle" className="review-x-label">
-                {p.label}
-              </text>
+              <>
+                <text x={p.x} y={height - 10} textAnchor="middle" className="review-x-label">
+                  {p.label}
+                </text>
+                {p.count > 0 ? (
+                  <text x={p.x} y={Math.max(top + 10, p.y - 8)} textAnchor="middle" className="review-value-label">
+                    {p.count}
+                  </text>
+                ) : null}
+              </>
             ) : null}
           </g>
         ))}
@@ -112,7 +135,7 @@ export default function App() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResultCount, setImportResultCount] = useState(null);
-  const [reviewCurveGranularity, setReviewCurveGranularity] = useState("daily");
+  const [reviewCurveGranularity, setReviewCurveGranularity] = useState("weekly");
 
   const [entryForm, setEntryForm] = useState({ word: "", sentence: "" });
 
@@ -141,12 +164,11 @@ export default function App() {
 
   const reviewCurveConfig = useMemo(() => {
     const map = {
-      daily: { title: "复习曲线（每天）", data: stats?.review_daily_trend || [] },
-      weekly: { title: "复习曲线（每周）", data: stats?.review_weekly_trend || [] },
-      monthly: { title: "复习曲线（每月）", data: stats?.review_monthly_trend || [] },
-      yearly: { title: "复习曲线（每年）", data: stats?.review_yearly_trend || [] },
+      weekly: { title: "复习曲线（每周）", data: stats?.review_weekly_trend || [], yTickStep: 50 },
+      monthly: { title: "复习曲线（每月）", data: stats?.review_monthly_trend || [], yTickStep: 200 },
+      yearly: { title: "复习曲线（每年）", data: stats?.review_yearly_trend || [], yTickStep: 2000 },
     };
-    return map[reviewCurveGranularity] || map.daily;
+    return map[reviewCurveGranularity] || map.weekly;
   }, [reviewCurveGranularity, stats]);
 
   async function loadReview() {
@@ -591,7 +613,6 @@ export default function App() {
                 onChange={(e) => setReviewCurveGranularity(e.target.value)}
                 aria-label="复习曲线时间粒度"
               >
-                <option value="daily">每天</option>
                 <option value="weekly">每周</option>
                 <option value="monthly">每月</option>
                 <option value="yearly">每年</option>
@@ -599,7 +620,11 @@ export default function App() {
             </div>
           </div>
           <div className="review-line-single">
-            <ReviewLineChart title={reviewCurveConfig.title} data={reviewCurveConfig.data} />
+            <ReviewLineChart
+              title={reviewCurveConfig.title}
+              data={reviewCurveConfig.data}
+              yTickStep={reviewCurveConfig.yTickStep}
+            />
           </div>
         </section>
       )}

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -403,6 +403,11 @@ def _bucket_key_year(dt: datetime):
     return f"{dt.year}"
 
 
+def _iso_weeks_in_year(year: int) -> int:
+    # ISO year has 52 or 53 weeks. Dec 28 is always in the last ISO week.
+    return date(year, 12, 28).isocalendar().week
+
+
 def _shift_month_start(base: datetime, delta_months: int) -> datetime:
     month_index = (base.month - 1) + delta_months
     year = base.year + (month_index // 12)
@@ -442,13 +447,17 @@ def get_unified_stats(db: Session):
     weekly_points = [{"label": k, "count": weekly[k]} for k in sorted(weekly.keys())][-12:]
     monthly_points = [{"label": k, "count": monthly[k]} for k in sorted(monthly.keys())][-12:]
 
-    current_week_start = today_start - timedelta(days=today_start.weekday())
-    current_month_start = today_start.replace(day=1)
     current_year_start = today_start.replace(month=1, day=1)
+    next_year_start = current_year_start.replace(year=current_year_start.year + 1)
+    current_year = current_year_start.year
 
-    daily_keys = [_bucket_key_day(today_start - timedelta(days=i)) for i in reversed(range(14))]
-    weekly_keys = [_bucket_key_week(current_week_start - timedelta(weeks=i)) for i in reversed(range(12))]
-    monthly_keys = [_bucket_key_month(_shift_month_start(current_month_start, -i)) for i in reversed(range(12))]
+    daily_keys = [
+        (current_year_start + timedelta(days=i)).strftime("%m-%d")
+        for i in range((today_start - current_year_start).days + 1)
+    ]
+    iso_week_count = _iso_weeks_in_year(current_year)
+    weekly_keys = [f"W{i:02d}" for i in range(1, iso_week_count + 1)]
+    monthly_keys = [f"{i:02d}月" for i in range(1, 13)]
     yearly_keys = [_bucket_key_year(current_year_start.replace(year=current_year_start.year - i)) for i in reversed(range(5))]
 
     review_window_start = current_year_start.replace(year=current_year_start.year - 4)
@@ -465,14 +474,16 @@ def get_unified_stats(db: Session):
 
     for (reviewed_at,) in review_rows:
         dt = reviewed_at
-        d_key = _bucket_key_day(dt)
-        w_key = _bucket_key_week(dt)
-        m_key = _bucket_key_month(dt)
         y_key = _bucket_key_year(dt)
-        review_daily_counts[d_key] = review_daily_counts.get(d_key, 0) + 1
-        review_weekly_counts[w_key] = review_weekly_counts.get(w_key, 0) + 1
-        review_monthly_counts[m_key] = review_monthly_counts.get(m_key, 0) + 1
         review_yearly_counts[y_key] = review_yearly_counts.get(y_key, 0) + 1
+
+        if current_year_start <= dt < next_year_start:
+            d_key = dt.strftime("%m-%d")
+            w_key = f"W{dt.isocalendar().week:02d}"
+            m_key = f"{dt.month:02d}月"
+            review_daily_counts[d_key] = review_daily_counts.get(d_key, 0) + 1
+            review_weekly_counts[w_key] = review_weekly_counts.get(w_key, 0) + 1
+            review_monthly_counts[m_key] = review_monthly_counts.get(m_key, 0) + 1
 
     review_daily_points = [{"label": k, "count": review_daily_counts.get(k, 0)} for k in daily_keys]
     review_weekly_points = [{"label": k, "count": review_weekly_counts.get(k, 0)} for k in weekly_keys]

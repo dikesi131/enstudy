@@ -430,6 +430,16 @@ button:active {
   stroke-width: 1;
 }
 
+.review-y-grid {
+  stroke: #e1eadb;
+  stroke-width: 1;
+}
+
+.review-y-label {
+  font-size: 10px;
+  fill: #69736b;
+}
+
 .review-line {
   fill: none;
   stroke: #2e7a56;
@@ -445,6 +455,12 @@ button:active {
 .review-x-label {
   font-size: 10px;
   fill: #5d665f;
+}
+
+.review-value-label {
+  font-size: 10px;
+  font-weight: 700;
+  fill: #275f46;
 }
 
 @keyframes heroIn {
