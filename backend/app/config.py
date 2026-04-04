@@ -31,6 +31,13 @@ class Settings:
 
     piper_executable: str = os.getenv("PIPER_EXECUTABLE", "piper")
     piper_model_path: str = os.getenv("PIPER_MODEL_PATH", "")
+    project_root: Path = Path(__file__).resolve().parent.parent.parent
+    articles_dir: Path = Path(
+        os.getenv(
+            "ARTICLES_DIR",
+            str(Path(__file__).resolve().parent.parent.parent / "articles"),
+        )
+    )
 
     @property
     def database_url(self) -> str:

@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   completeReview,
   createEntry,
+  exportArticleMarkdown,
+  exportAllArticlesZip,
   exportData,
+  fetchArticleContent,
+  fetchArticles,
   fetchEntries,
   fetchReview,
   fetchStats,
   getSentenceAudioBlob,
   getWordAudioUrl,
+  importArticles,
   importData,
 } from "./api";
 
-const TABS = ["复习", "词条管理", "导入导出", "统计趋势", "复习曲线"];
+const TABS = ["复习", "词条管理", "文章管理", "导入导出", "统计趋势", "复习曲线"];
 const REVIEW_PAGE_SIZE = 8;
 const MANAGE_PAGE_SIZE = 10;
 
@@ -136,6 +143,9 @@ export default function App() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResultCount, setImportResultCount] = useState(null);
   const [reviewCurveGranularity, setReviewCurveGranularity] = useState("weekly");
+  const [articles, setArticles] = useState([]);
+  const [articleReading, setArticleReading] = useState(null);
+  const [articleLoading, setArticleLoading] = useState(false);
 
   const [entryForm, setEntryForm] = useState({ word: "", sentence: "" });
 
@@ -218,6 +228,15 @@ export default function App() {
     }
   }
 
+  async function loadArticles() {
+    try {
+      const data = await fetchArticles();
+      setArticles(data.items || []);
+    } catch (err) {
+      setMessage(err?.response?.data?.detail || "加载文章列表失败。 ");
+    }
+  }
+
   useEffect(() => {
     loadReview();
   }, []);
@@ -229,6 +248,9 @@ export default function App() {
   useEffect(() => {
     if (tab === "词条管理") {
       loadEntries();
+    }
+    if (tab === "文章管理") {
+      loadArticles();
     }
     if (tab === "统计趋势" || tab === "复习曲线") {
       loadStats();
@@ -326,6 +348,68 @@ export default function App() {
         setImportProgress(0);
       }, 300);
       e.target.value = "";
+    }
+  }
+
+  async function handleArticleImport(e) {
+    const fileList = Array.from(e.target.files || []);
+    if (!fileList.length) return;
+    try {
+      const result = await importArticles(fileList, true);
+      const importedCount = result.imported_count || 0;
+      const skippedCount = result.skipped_count || 0;
+      setMessage(
+        skippedCount
+          ? `文章导入完成：新增 ${importedCount} 篇，跳过 ${skippedCount} 篇。`
+          : `文章导入完成：新增 ${importedCount} 篇。`
+      );
+      loadArticles();
+    } catch (err) {
+      setMessage(err?.response?.data?.detail || "文章导入失败。 ");
+    } finally {
+      e.target.value = "";
+    }
+  }
+
+  async function openArticleReader(filename) {
+    try {
+      setArticleLoading(true);
+      const data = await fetchArticleContent(filename);
+      setArticleReading(data);
+    } catch (err) {
+      setMessage(err?.response?.data?.detail || "加载文章内容失败。 ");
+    } finally {
+      setArticleLoading(false);
+    }
+  }
+
+  async function handleExportArticle(filename) {
+    try {
+      const blob = await exportArticleMarkdown(filename);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage(`已导出文章：${filename}`);
+    } catch (err) {
+      setMessage(err?.response?.data?.detail || "导出文章失败。 ");
+    }
+  }
+
+  async function handleExportAllArticles() {
+    try {
+      const blob = await exportAllArticlesZip();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "articles-export.zip";
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage("已导出全部文章（ZIP）。");
+    } catch (err) {
+      setMessage(err?.response?.data?.detail || "批量导出文章失败。 ");
     }
   }
 
@@ -454,6 +538,28 @@ export default function App() {
         </div>
       )}
 
+      {articleReading && (
+        <div className="article-reader-mask" role="dialog" aria-modal="true">
+          <div className="article-reader-panel">
+            <div className="article-reader-header">
+              <div>
+                <h2>{articleReading.title}</h2>
+                <p>{articleReading.filename}</p>
+              </div>
+              <div className="controls">
+                <button onClick={() => handleExportArticle(articleReading.filename)}>导出 Markdown</button>
+                <button onClick={() => setArticleReading(null)}>退出全屏</button>
+              </div>
+            </div>
+            <div className="article-reader-content markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {articleReading.content || ""}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === "复习" && (
         <section className="panel">
           <div className="row">
@@ -571,6 +677,49 @@ export default function App() {
             </div>
             <p>JSON 格式: {`{"items":[{"word":"resilient","sentence":"..."}]}`}</p>
             <p>CSV 表头: word,sentence</p>
+          </div>
+        </section>
+      )}
+
+      {tab === "文章管理" && (
+        <section className="panel">
+          <div className="card">
+            <div className="row">
+              <h3>导入 / 导出 Markdown 文章</h3>
+              <div className="controls">
+                <label className="upload">
+                  导入 Markdown
+                  <input type="file" accept=".md,text/markdown" multiple onChange={handleArticleImport} />
+                </label>
+                <button onClick={handleExportAllArticles}>导出全部 ZIP</button>
+              </div>
+            </div>
+            <p>导入后的文章会统一保存到服务端 articles 文件夹下。</p>
+          </div>
+
+          <div className="card">
+            <div className="row">
+              <h3>文章列表</h3>
+              <span className="chip">共 {articles.length} 篇</span>
+            </div>
+            {articleLoading && <p>正在加载文章内容...</p>}
+            {!articles.length && <p>暂无文章，请先导入 Markdown 文件。</p>}
+            {articles.map((article) => (
+              <div key={article.filename} className="item article-item">
+                <button
+                  className="article-open-btn"
+                  onClick={() => openArticleReader(article.filename)}
+                >
+                  <strong>{article.title}</strong>
+                  <p>{article.filename}</p>
+                  <p>更新时间: {new Date(article.updated_at).toLocaleString()}</p>
+                </button>
+                <div className="controls">
+                  <button onClick={() => openArticleReader(article.filename)}>全屏阅读</button>
+                  <button onClick={() => handleExportArticle(article.filename)}>导出</button>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

@@ -463,6 +463,130 @@ button:active {
   fill: #275f46;
 }
 
+.article-item {
+  align-items: center;
+}
+
+.article-open-btn {
+  flex: 1;
+  text-align: left;
+  background: #f4fbef;
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.article-open-btn:hover {
+  background: #eaf5e1;
+}
+
+.article-open-btn p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.article-reader-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 16, 12, 0.78);
+  z-index: 1100;
+  padding: 16px;
+}
+
+.article-reader-panel {
+  width: min(1100px, 100%);
+  height: calc(100vh - 32px);
+  margin: 0 auto;
+  border-radius: 16px;
+  background: #fdfef9;
+  border: 1px solid #d5ddca;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.article-reader-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #f0f8e7, #f9fbf1);
+}
+
+.article-reader-header h2 {
+  margin: 0;
+}
+
+.article-reader-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.article-reader-content {
+  flex: 1;
+  overflow: auto;
+  padding: 22px;
+}
+
+.markdown-body {
+  line-height: 1.72;
+  color: #263126;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: 1.4em;
+  margin-bottom: 0.6em;
+  color: #163c2a;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote {
+  margin: 0.7em 0;
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid #9dbf9e;
+  padding: 4px 12px;
+  background: #f3f8ef;
+}
+
+.markdown-body code {
+  background: #eef3e7;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.markdown-body pre {
+  background: #1e2a23;
+  color: #ebf4e6;
+  border-radius: 10px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #d4dfc9;
+  padding: 8px;
+}
+
 @keyframes heroIn {
   from {
     opacity: 0;
@@ -492,6 +616,20 @@ button:active {
   }
 
   .row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .article-reader-mask {
+    padding: 0;
+  }
+
+  .article-reader-panel {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .article-reader-header {
     flex-direction: column;
     align-items: flex-start;
   }

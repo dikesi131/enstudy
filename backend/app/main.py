@@ -5,6 +5,7 @@ from sqlalchemy import inspect, text
 from app.config import settings
 from app.database import Base, engine
 from app.routers import audio, entries, io_ops, review, stats
+from app.routers.articles import router as articles_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -49,6 +50,7 @@ app.include_router(review.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(io_ops.router, prefix="/api")
 app.include_router(audio.router, prefix="/api")
+app.include_router(articles_router, prefix="/api")
 
 
 @app.get("/api/health")

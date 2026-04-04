@@ -25,3 +25,9 @@ backend/generated_audio/
 
 # models
 models/
+
+# export
+export/
+
+# articles
+articles/

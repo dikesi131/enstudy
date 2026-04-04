@@ -57,3 +57,36 @@ export async function getSentenceAudioBlob(text, entryId = null) {
   );
   return response.data;
 }
+
+export async function fetchArticles() {
+  const { data } = await api.get("/articles");
+  return data;
+}
+
+export async function importArticles(files, overwrite = true) {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  const { data } = await api.post(`/articles/import?overwrite=${overwrite}`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export async function fetchArticleContent(filename) {
+  const { data } = await api.get(`/articles/${encodeURIComponent(filename)}`);
+  return data;
+}
+
+export async function exportArticleMarkdown(filename) {
+  const response = await api.get(`/articles/${encodeURIComponent(filename)}/export`, {
+    responseType: "blob",
+  });
+  return response.data;
+}
+
+export async function exportAllArticlesZip() {
+  const response = await api.get("/articles/export-all", {
+    responseType: "blob",
+  });
+  return response.data;
+}
